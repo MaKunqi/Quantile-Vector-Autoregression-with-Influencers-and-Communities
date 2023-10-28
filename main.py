@@ -149,7 +149,6 @@ for i in range(2,6,1):#set a appropriate section when choosing optimaL cluster n
     '''
     #record result if you want 
     file_path = "D:\\work\\论文\\results_empirical_new_tau=0.5__K2~6.txt"
-    # 使用'with'语句打开文件进行写入
     with open(file_path, 'a') as file:
         #file.write("Indices:\n")
         #file.write(str(indices))
