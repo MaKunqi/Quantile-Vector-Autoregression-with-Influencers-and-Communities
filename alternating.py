@@ -37,17 +37,16 @@ def loss(Y,v,z,alpha):
     sum = 0
     for t in range(T - 1):
         for i in range(n):
-            #sum += K(x=Y.iloc[t + 1,i] - np.matmul(np.matmul(v, z[:, i]).T, Y.iloc[t].T)) + alpha * np.linalg.norm(z[:, i], ord=1)
             sum += K(x=Y.iloc[t + 1, i] - np.matmul(np.matmul(v, z[:, i]).T, Y.iloc[t].T))
     print(sum)
     return sum
-
-def v_step(Y_in, lamb_in, z_in,v_initial): #lamb_in是惩罚项系数，v_initial是开始位置，梯度下降求新v=n*k维矩阵
+#lamb_in is regularization parameter，v_initial is initial cluster，solve new sluster by gradient descent
+def v_step(Y_in, lamb_in, z_in,v_initial):
     def reshape_to_matrix(v_flat, shape):
         return v_flat.reshape(shape)
-    def create_loss_function(Y, z, lamb, v_shape):#计算损失函数
-        def loss_function_with_fixed_params(v_flat):#v_flat是v的展开成向量形式
-            v = reshape_to_matrix(v_flat, v_shape)  # 将v_flat转回矩阵形式
+    def create_loss_function(Y, z, lamb, v_shape):#calculate loss function
+        def loss_function_with_fixed_params(v_flat):#v_flat is flattened v
+            v = reshape_to_matrix(v_flat, v_shape)
             T, n = Y.shape#T*n
             x, k = v.shape#n*k
             p, q = z.shape#k*n
@@ -64,9 +63,9 @@ def v_step(Y_in, lamb_in, z_in,v_initial): #lamb_in是惩罚项系数，v_initia
 
         return loss_function_with_fixed_params
 
-    def create_grad_function(Y, z, lamb, v_shape):#计算损失函数
-        def grad_function_with_fixed_params(v_flat):#v_flat是v的展开成向量形式
-            v = reshape_to_matrix(v_flat, v_shape)  # 将v_flat转回矩阵形式
+    def create_grad_function(Y, z, lamb, v_shape):
+        def grad_function_with_fixed_params(v_flat):
+            v = reshape_to_matrix(v_flat, v_shape)
             T, n = Y.shape
             x, k = v.shape
             p, q = z.shape
@@ -85,19 +84,20 @@ def v_step(Y_in, lamb_in, z_in,v_initial): #lamb_in是惩罚项系数，v_initia
 
         return grad_function_with_fixed_params
 
-    Y, z, lamb = Y_in,z_in,lamb_in # 你的已知参数
-    v_initial_matrix = v_initial  # 你的初始矩阵v的值
-    x0 = v_initial_matrix.flatten()  # 将矩阵v展平为一个向量
-    v_shape = v_initial_matrix.shape  # 记录v的形状以供后续使用
+    Y, z, lamb = Y_in,z_in,lamb_in
+    v_initial_matrix = v_initial
+    x0 = v_initial_matrix.flatten()
+    v_shape = v_initial_matrix.shape
     objective_function = create_loss_function(Y, z, lamb, v_shape)
     gradient_function=create_grad_function(Y, z, lamb, v_shape)
     print('v_step')
     res = minimize(objective_function, x0, method='Newton-CG', jac=gradient_function,
                    options={'maxiter': 100})
     tmp=res.x
-    return reshape_to_matrix(tmp, v_shape)#返回v,形状是n*k
+    return reshape_to_matrix(tmp, v_shape)#return v,shaped n*k
 
-def v_new_step(Y,lamb_in, z,v): #lamb_in是惩罚项系数，v_initial是开始位置，梯度下降求新v=n*k维矩阵
+
+def v_new_step(Y,lamb_in, z,v):#lamb_in is regularization parameter，v_initial is initial cluster,solve by conquer.linear_model package
     global h, tau
     print('v_new_step')
     T, n = Y.shape#T*n
@@ -110,7 +110,7 @@ def v_new_step(Y,lamb_in, z,v): #lamb_in是惩罚项系数，v_initial是开始�
     ans=np.zeros((n,1))
     for i in range(k):
         print(i)
-        N= np.sum(z[i, :])#即Ni,第i个聚类的元素个数
+        N= np.sum(z[i, :])#the size of i_th cluster
         N=int(N)
         if N==0:
             beta_value=np.zeros((1,n))
@@ -150,36 +150,7 @@ def v_new_step(Y,lamb_in, z,v): #lamb_in是惩罚项系数，v_initial是开始�
     ans=ans[:,1:]
     return ans
 
-
-
-def z_step(Y, v):#已知v,枚举寻找最好的z
-    print('z_step')
-    T, n = Y.shape
-    x, k = v.shape
-    ans = np.empty((k, 0))
-    assert (x == n)
-    assert (k <= n)
-
-    for j in range(n):
-        tmp = []
-        for i in range(k):
-            sum = 0
-            vector = np.zeros(k)
-            vector[i] = 1
-            for t in range(T - 1):
-                sum += quantile_loss(Y.iloc[t + 1, i] - np.matmul(np.matmul(v, vector).T, Y.iloc[t, :]))
-            tmp.append(sum)
-
-        min_value = min(tmp)
-        min_index = tmp.index(min_value)
-        vector = np.zeros(k)
-        vector[min_index] = 1
-        ans = np.column_stack((ans, vector))
-
-    print(ans.shape)
-    return ans
-
-def z_new_step(Y,z, v):#已知v,枚举寻找最好的一步改变的z
+def z_new_step(Y,z, v):#known v, find best z nearby
     print('z_new_step')
     T, n = Y.shape
     x, k = v.shape
@@ -195,7 +166,6 @@ def z_new_step(Y,z, v):#已知v,枚举寻找最好的一步改变的z
             vector = np.zeros((k, 1))
             vector[i] = 1
 
-            # 使用np.matmul进行矩阵运算，并利用numpy广播进行向量与矩阵的减法
             sum_val = np.sum(quantile_loss(
                 Y.iloc[1:, j].values - np.matmul(np.matmul(v, vector).T, Y.iloc[:-1, :].values.T).flatten()) -
                              quantile_loss(Y.iloc[1:, j].values - np.matmul(np.matmul(v, z[:, j]).T,
@@ -205,6 +175,6 @@ def z_new_step(Y,z, v):#已知v,枚举寻找最好的一步改变的z
                 tmp = sum_val
                 index = [j, i]
 
-    z[:, index[0]] = 0  # 将第j列的所有元素设置为0
+    z[:, index[0]] = 0
     z[index[1], index[0]] = 1
     return z

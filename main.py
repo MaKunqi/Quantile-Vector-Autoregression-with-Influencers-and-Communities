@@ -2,15 +2,14 @@ import pandas as pd
 import numpy as np
 import pickle
 from prepare import quantile_VAR,missing_var,random_basis,index_dist,get_index_matrix
-from alternating import H,K,z_step,v_step,loss,z_new_step,v_new_step
-from simulation import simulation
+from alternating import H,K,v_step,loss,z_new_step,v_new_step
 from cvxopt import spmatrix , sparse,solvers, matrix
 from cvxopt.solvers import qp, lp
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.linalg import sqrtm
 from statsmodels.regression.quantile_regression import QuantReg
-def alternating(Y, alpha_v, V_start,epochs=200):#已知Y，V的开始值，聚类数，迭代计算
+def alternating(Y, alpha_v, V_start,epochs=200):#known Y, initial V, cluster num: Alternating Iterative Solution
     T, n = Y.shape
     x, k = V_start.shape
     assert (x == n)
@@ -42,78 +41,57 @@ def alternating(Y, alpha_v, V_start,epochs=200):#已知Y，V的开始值，聚�
 
 def quantile_sonic(data,n,num_clusters):
     V = random_basis(n, num_clusters)
-    #print(V.shape)  # V是一个N*K的矩阵
-    zeronums = data.isnull().sum()  # 统计每列空值的个数，并填充为0
+    #print(V.shape)  # V shapes N*K
+    zeronums = data.isnull().sum()  # calculate numbers of null in each column,and replace as 0
     data = data.fillna(0)
     #print(data)
-    T, n = np.shape(data)  # T是时间长度，n是个体个数,全部数据下n=28,T=1879
-    P = np.zeros(n)  # P是pi的估计值构成的向量（矩阵形式）
+    T, n = np.shape(data)  # T is length of data，n is number of nodes
+    P = np.zeros(n)
     for i in range(n):
         P[i] = 1 - zeronums[i] / T
-    Sigmahat = missing_var(data, P)  # 计算Sigmahat 28*28,协方差估计值
+    Sigmahat = missing_var(data, P)  #following estimation of Var in SONIC, P is a vector filled with 1
     Sigmahat = Sigmahat.values
-    # 数据驱动找惩罚项系数
+    # find parameter of regularization by data driven
     alpha = (np.linalg.eigvalsh(Sigmahat)[-(num_clusters + 1)]) * np.sqrt(np.log(n)) / np.sqrt(T * np.min(P) ** 2)
     print(alpha)
     ans=alternating(data, alpha,V)
 
     return ans
 
-
+#alternating from different initial cluster, repeat to find global optimum
 def repeat_and_select_best(data, n, cluster_num, repeat_times=10):
     best_result = None
-    best_score = float('inf')  # 设置一个足够大的初值
+    best_score = float('inf')  # set a initial value enough big
 
     for _ in range(repeat_times):
         z_est, v_est, score = quantile_sonic(data, n, cluster_num)
-        if score < best_score:  # 如果当前分数更低，则更新最佳结果
+        if score < best_score:  # update result if less loss
             best_score = score
             best_result = (z_est, v_est, score)
 
     return best_result
 
 
-#N=100
+
 distance=np.zeros((10,5))
 data = pd.read_csv('RealData/macro40.csv',index_col=0) # read data
-#data=data.iloc[:-1]
 print(data)
-#column_name_to_be_removed = 'Qatar'
-#if column_name_to_be_removed in data.columns:
-#    data = data.drop(columns=[column_name_to_be_removed])
-normalized_data = (data - data.min()) / (data.max() - data.min())
+normalized_data = (data - data.min()) / (data.max() - data.min())#normalize date in case of different order of magnitude
 print(normalized_data)
 data=normalized_data
-for i in range(2,3,1):
-    cluster_num=i#聚类数
-    #data = data.iloc[521:1565]
-    '''
-    data=simulation(N,cluster_num)
-    c_size = int(N // cluster_num)
-    r = N - cluster_num * c_size
-    ind_star = np.array([int(i // (c_size + 1)) if i < r * (c_size + 1)
-                                 else int((i - r * (c_size + 1)) // c_size) + r for i in range(N)])
-    print(ind_star)
-    '''
-
+for i in range(2,6,1):#set a appropriate section when choosing optimaL cluster number, or set a specified cluster number when solving
+    cluster_num=i
     print(data)
     names = data.columns.values
     print(names)
-    #data = data.iloc[:-18]
-    data_filled = data.fillna(method='ffill')#向前向后对齐，使得没有缺失值
+    data_filled = data.fillna(method='ffill')#fill in case of empty value
     data_filled = data_filled.fillna(method='bfill')
     data_filled = data_filled.fillna(method='bfill')
-    #data_filled = data_filled.diff(periods=1)#对波动率数据差分
     _, n = np.shape(data)
     print(data_filled)
-    zeronums = data_filled.isnull().sum()  # 统计每列空值的个数，并填充为0
-    #data_filled=data_filled.iloc[50:]
-    #print(type(data_filled))
-    #print(data_filled.shape)
-    #fit = quantile_VAR(data_filled, configuration={'nlag': 1, 'tau': 0.5})
-    #U, S, VT = np.linalg.svd(fit['B'])#计算得到开始值V
-    #V = U[:, :cluster_num]
-
+    zeronums = data_filled.isnull().sum()
+    '''
+    #this part is solving optimization problem and plot a heatmap of autoregression parameter
     result_z, result_v, score = repeat_and_select_best(data_filled, n, cluster_num,repeat_times=40)
     #with open('ecodata_first_no_lambda_in_loss,tau0.8,k=3.pickle', 'wb') as f:
     #   pickle.dump((result_z, result_v, score), f)
@@ -121,7 +99,7 @@ for i in range(2,3,1):
     v_est=result_v
     z_est=result_z
     ind_est=np.argmax(result_z, axis=0)
-    lists = [[] for i in range(cluster_num)]  # 按类将聚类元素分组
+    lists = [[] for i in range(cluster_num)]  
     for i in range(n):
         lists[ind_est[i]].append(i)
     print(lists)
@@ -131,7 +109,7 @@ for i in range(2,3,1):
     print(rearrange)
     print(names)
     print(names[rearrange])
-    theta_sort = theta_est[rearrange].T  # 重新按照聚类排列theta_est
+    theta_sort = theta_est[rearrange].T  # realign to show in heatmap
     theta_sort = theta_sort[rearrange].T
     print(theta_sort)
     plt.figure()
@@ -143,30 +121,13 @@ for i in range(2,3,1):
     plt.savefig("ecoheatmap/review_new_withoutlasso,tau0.8,k=2.png", dpi=600)
     plt.show()
     '''
-    data1 = data_filled.iloc[:109]
-    data2 = data_filled.iloc[7:116]
-    data3 = data_filled.iloc[14:123]
-    data4 = data_filled.iloc[22:131]
-    data5 = data_filled.iloc[29:138]
-    data6 = data_filled.iloc[36:]
     '''
-    '''
+    #this part is a stability test to choose an appropriate cluster number K
     data1 = data_filled.iloc[:155]
     data2 = data_filled.iloc[10:165]
     data3 = data_filled.iloc[20:175]
     data4 = data_filled.iloc[30:185]
     data5 = data_filled.iloc[40:]
-    '''
-    '''
-    #521-1043疫情前两年
-    #1043-1565,2020-2021年疫情最严重的两年
-    data1 = data_filled.iloc[521:1356]
-    data2 = data_filled.iloc[573:1408]
-    data3 = data_filled.iloc[625:1461]
-    data4 = data_filled.iloc[678:1513]
-    data5 = data_filled.iloc[730:1565]
-    '''
-    '''
     result_z1, result_v1, _ =repeat_and_select_best(data1,n,cluster_num)
     indices1 = np.argmax(result_z1, axis=0)
     result_z2, result_v2, _ =repeat_and_select_best(data2, n, cluster_num)
@@ -186,6 +147,7 @@ for i in range(2,3,1):
     distance[(i - 2), 4] = index_dist(i, indices6, indices1)
     '''
     '''
+    #record result if you want 
     file_path = "D:\\work\\论文\\results_empirical_new_tau=0.5__K2~6.txt"
     # 使用'with'语句打开文件进行写入
     with open(file_path, 'a') as file:
@@ -208,7 +170,7 @@ for i in range(2,3,1):
     '''
 print('tau=',0.8)
 print('economy data,tau=0.5')
-print(distance)
+print(distance)#distance shows the result of stability test
 
 
 

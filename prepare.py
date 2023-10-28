@@ -12,33 +12,33 @@ def random_basis(n, k):
     x = np.random.randn(n, k)
     return np.matmul(x, sqrtm(np.linalg.inv(np.matmul(x.T, x))))
 
-def missing_var(X, P): #X是数据(T*n)，P是pi的估计值构成的向量（矩阵形式），返回协方差阵估计值
-    T = np.shape(X)[0]  #数据的时间长度
-    S = np.matmul(X.T, X) / T  #观测到的经验协方差阵
+def missing_var(X, P):
+    T = np.shape(X)[0]
+    S = np.matmul(X.T, X) / T
     D = np.diag(np.diag(S))
     Delta = np.diag(P ** (-1))
     Sigma = np.matmul(Delta, np.matmul(S - D, Delta)) + np.matmul(Delta, D)
     return Sigma
 
-def missing_cross_var(X, P): #X是数据(T*n)，P是pi的估计值构成的向量（矩阵形式），返回交叉协方差阵估计值
-    T = np.shape(X)[0]  #数据的时间长度
-    X1 = X.iloc[:-1, :]  #X1,X2均是数据，X2滞后1阶
+def missing_cross_var(X, P):
+    T = np.shape(X)[0]
+    X1 = X.iloc[:-1, :]
     X2 = X.iloc[1:, :]
     X1_np = X1.to_numpy()
     X2_np = X2.to_numpy()
-    S = np.matmul(X1_np.T, X2_np) / (T-1)  #观测到的经验交叉协方差阵
+    S = np.matmul(X1_np.T, X2_np) / (T-1)
     Delta = np.diag(P ** (-1))
     A = np.matmul(Delta, np.matmul(S, Delta))
     return A
 
-def get_index_matrix(cluster_num, ind, normalize=True):  #已知聚类ind,聚类数，求索引矩阵z n*k
+def get_index_matrix(cluster_num, ind, normalize=True):  #known index of nodes,cluster_num，get index matrix z
     n = np.size(ind)
     ind_mat = np.zeros((n, cluster_num))
 
     for i in range(n):
         ind_mat[i, ind[i]] = 1.
 
-    if normalize:  #标准化索引矩阵z
+    if normalize:  #normalized z
         for j in range(cluster_num):
             x = ind_mat[:, j]
             norm = np.linalg.norm(x)
@@ -50,7 +50,7 @@ def get_index_matrix(cluster_num, ind, normalize=True):  #已知聚类ind,聚类
 
     return ind_mat
 
-def index_dist(cluster_num, int1, int2):  #求两个聚类的距离，int1,int2分别代表两个聚类
+def index_dist(cluster_num, int1, int2):  #get distance between 2 cluster，int1,int2 represent 2 indexes of nodes
     n = np.size(int1)
     assert (np.size(int2 == n))
 
@@ -76,7 +76,7 @@ def index_dist(cluster_num, int1, int2):  #求两个聚类的距离，int1,int2�
 
     return n + round(res['primal objective'])
 
-def quantile_VAR(x, configuration={'nlag': 1, 'tau': 0.5}):#计算最初的出发项Theta
+def quantile_VAR(x, configuration={'nlag': 1, 'tau': 0.5}):
     tau = float(configuration['tau'])
     nlag = int(configuration['nlag'])
 

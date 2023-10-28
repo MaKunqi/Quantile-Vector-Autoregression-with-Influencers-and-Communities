@@ -6,7 +6,6 @@ from alternating import H,K,z_step,v_step,loss,z_new_step,v_new_step
 from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
 
-from simulation import simulation
 from cvxopt import spmatrix , sparse,solvers, matrix
 from cvxopt.solvers import qp, lp
 import seaborn as sns
