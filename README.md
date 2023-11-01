@@ -1,5 +1,5 @@
 # Quantile-Vector-Autoregression-with-Influencers-and-Communities
-''Please switch to the master branch to view more details.''
+**``Please switch to the master branch to view more details.``**
 This is a solution algorithm for a novel high-dimensional quantile vector autoregression (QVAR) model accompanied by influencers and communities.
 "prepare.py" contains functions used for preparatory work before the algorithm execution, mainly functions to generate cluster indices(get_index_matrix( )), randomize initial positions(random_basis( )), and compute inter-cluster distances(index_dist( )).
 "alternating.py" contains frequently used functions during execution, mainly including the kernel function, loss function, and the two most crucial alternating iterative functions: v_new_step( ) and z_new_step( ). It's worth noting that the selection of the quantile τ is specified within this file.
